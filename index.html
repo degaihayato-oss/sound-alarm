@@ -1,147 +1,132 @@
-⁠
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>音検知アラーム</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 20px;
-      background-color: #f4f4f9;
-    }
-    button {
-      font-size: 1.2rem;
-      padding: 12px 24px;
-      margin: 10px;
-      border: none;
-      border-radius: 8px;
-      background-color: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-    button:disabled {
-      background-color: #ccc;
-    }
-    .status {
-      margin-top: 20px;
-      font-size: 1.1rem;
-      font-weight: bold;
-    }
-    .meter {
-      font-size: 2rem;
-      color: #333;
-      margin: 15px 0;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音検知アラーム</title>
+<style>
+  body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f9; }
+  .card { background: white; padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+  button { font-size: 16px; padding: 12px 24px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; }
+  #startBtn { background-color: #007aff; color: white; }
+  #stopBtn { background-color: #8e8e93; color: white; }
+  .slider-container { margin: 20px 0; }
+  input[type=range] { width: 80%; }
+  .meter { height: 20px; background: #e0e0e0; border-radius: 10px; overflow: hidden; margin: 15px 0; }
+  #meterBar { height: 100%; width: 0%; background: #34c759; transition: width 0.1s; }
+</style>
 </head>
 <body>
+<div class="card">
+  <h2>音検知アラーム</h2>
+  <button id="startBtn" onclick="startMonitoring()">監視スタート</button>
+  <button id="stopBtn" onclick="stopMonitoring()" disabled>ストップ</button>
 
-  <h1>音検知アラーム</h1>
-  <p>周囲の音が一定レベルを超えると音が鳴ります。</p>
+  <div class="meter"><div id="meterBar"></div></div>
+  <p>現在の音量: <span id="currentVolume">0</span></p>
 
-  <button id="startBtn">監視スタート</button>
-  <button id="stopBtn" disabled>ストップ</button>
+  <div class="slider-container">
+    <label for="sensitivity">反応する感度（閾値）: <b id="thresholdVal">30</b></label><br>
+    <input type="range" id="sensitivity" min="5" max="100" value="30" oninput="updateThreshold(this.value)">
+    <p style="font-size: 12px; color: #666;">（数字を小さくすると小さな音でも反応します）</p>
+  </div>
+</div>
 
-  <div class="meter">現在の音量: <span id="volumeVal">0</span></div>
-  <div class="status" id="statusText">停止中</div>
+<script>
+let audioContext, analyser, microphone, stream;
+let isMonitoring = false;
+let threshold = 30;
+let lastTriggerTime = 0;
 
-  <script>
-    let audioContext = null;
-    let analyser = null;
-    let microphone = null;
-    let intervalId = null;
-    let isCooldown = false;
+function updateThreshold(val) {
+  threshold = parseInt(val);
+  document.getElementById('thresholdVal').innerText = val;
+}
 
-    const THRESHOLD = 30;       // 音量しきい値 (0〜255)
-    const CHECK_INTERVAL = 100; // 監視間隔 (ミリ秒)
-
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const volumeVal = document.getElementById('volumeVal');
-    const statusText = document.getElementById('statusText');
-
-    // 効果音（ビープ音）を発生させる関数
-    function playBeep() {
-      if (!audioContext) return;
-      const osc = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, audioContext.currentTime); // 880Hz
-
-      gain.gain.setValueAtTime(0.5, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3); // 0.3秒で減衰
-
-      osc.connect(gain);
-      gain.connect(audioContext.destination);
-
-      osc.start();
-      osc.stop(audioContext.currentTime + 0.3);
-    }
-
-    // 監視開始
-    startBtn.addEventListener('click', async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        
-        microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        statusText.innerText = "監視中...";
-        statusText.style.color = "green";
-
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        intervalId = setInterval(() => {
-          analyser.getByteFrequencyData(dataArray);
-          
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
-          }
-          const average = Math.round(sum / dataArray.length);
-          volumeVal.innerText = average;
-
-          // しきい値を超えた場合
-          if (average > THRESHOLD && !isCooldown) {
-            playBeep();
-            statusText.innerText = "音を感知しました！";
-            statusText.style.color = "red";
-            
-            isCooldown = true;
-            setTimeout(() => {
-              isCooldown = false;
-              statusText.innerText = "監視中...";
-              statusText.style.color = "green";
-            }, 1000); // 1秒間クールダウン
-          }
-        }, CHECK_INTERVAL);
-
-      } catch (err) {
-        alert("マイクのアクセス許可が必要です: " + err.message);
-      }
-    });
-
-    // 監視停止
-    stopBtn.addEventListener('click', () => {
-      if (intervalId) clearInterval(intervalId);
-      if (audioContext) audioContext.close();
+// Web Audio APIによる犬の鳴き声（ワン！ワン！）合成音
+function playDogBark() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  function bark(delay) {
+    setTimeout(() => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-      volumeVal.innerText = "0";
-      statusText.innerText = "停止中";
-      statusText.style.color = "black";
-    });
-  </script>
+      osc.type = 'sawtooth';
+      // 犬の鳴き声のピッチ推移
+      osc.frequency.setValueAtTime(350, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.15);
+      
+      gain.gain.setValueAtTime(0.8, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    }, delay);
+  }
+
+  bark(0);    // 1回目の「ワン！」
+  bark(200);  // 2回目の「ワン！」
+}
+
+async function startMonitoring() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    microphone = audioContext.createMediaStreamSource(stream);
+    
+    analyser.fftSize = 256;
+    microphone.connect(analyser);
+    
+    isMonitoring = true;
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+    
+    checkVolume();
+  } catch (err) {
+    alert('マイクのアクセス許可が必要です: ' + err.message);
+  }
+}
+
+function checkVolume() {
+  if (!isMonitoring) return;
+  
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(dataArray);
+  
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    sum += dataArray[i];
+  }
+  const average = Math.round(sum / dataArray.length);
+  
+  document.getElementById('meterBar').style.width = Math.min(100, average * 2) + '%';
+  document.getElementById('currentVolume').innerText = average;
+  
+  // 設定した閾値を超えた場合に犬の鳴き声を鳴らす（連続再生防止のため2秒の間隔を確保）
+  const now = Date.now();
+  if (average >= threshold && (now - lastTriggerTime > 2000)) {
+    lastTriggerTime = now;
+    playDogBark();
+  }
+  
+  requestAnimationFrame(checkVolume);
+}
+
+function stopMonitoring() {
+  isMonitoring = false;
+  if (stream) stream.getTracks().forEach(track => track.stop());
+  if (audioContext) audioContext.close();
+  
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('meterBar').style.width = '0%';
+  document.getElementById('currentVolume').innerText = '0';
+}
+</script>
 </body>
 </html>
