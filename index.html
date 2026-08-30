@@ -43,7 +43,7 @@ function updateThreshold(val) {
   document.getElementById('thresholdVal').innerText = val;
 }
 
-// Web Audio APIによる犬の鳴き声（ワン！ワン！）合成音
+// 可愛い小型犬の鳴き声（キャン！キャン！）
 function playDogBark() {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   
@@ -52,24 +52,27 @@ function playDogBark() {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       
-      osc.type = 'sawtooth';
-      // 犬の鳴き声のピッチ推移
-      osc.frequency.setValueAtTime(350, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.15);
+      // 高めの音色（三角波で柔らかい音）
+      osc.type = 'triangle';
       
-      gain.gain.setValueAtTime(0.8, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      // 高いピッチから可愛く跳ねるように下降（800Hz → 450Hz）
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(450, ctx.currentTime + 0.1);
+      
+      // キュートな音の余韻（短い減衰）
+      gain.gain.setValueAtTime(0.6, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
       
       osc.connect(gain);
       gain.connect(ctx.destination);
       
       osc.start();
-      osc.stop(ctx.currentTime + 0.15);
+      osc.stop(ctx.currentTime + 0.1);
     }, delay);
   }
 
-  bark(0);    // 1回目の「ワン！」
-  bark(200);  // 2回目の「ワン！」
+  bark(0);    // 1回目の「キャン！」
+  bark(120);  // 2回目の「キャン！」
 }
 
 async function startMonitoring() {
@@ -107,7 +110,7 @@ function checkVolume() {
   document.getElementById('meterBar').style.width = Math.min(100, average * 2) + '%';
   document.getElementById('currentVolume').innerText = average;
   
-  // 設定した閾値を超えた場合に犬の鳴き声を鳴らす（連続再生防止のため2秒の間隔を確保）
+  // 設定した閾値を超えた場合に鳴らす（連続再生防止のため2秒間隔）
   const now = Date.now();
   if (average >= threshold && (now - lastTriggerTime > 2000)) {
     lastTriggerTime = now;
