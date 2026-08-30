@@ -38,45 +38,27 @@ let isMonitoring = false;
 let threshold = 30;
 let lastTriggerTime = 0;
 
+// リアルな小型犬の鳴き声（本物のMP3音源データ）
+const dogBarkSound = new Audio('https://soundeffect-lab.info/sound/anime/mp3/dog-bark1.mp3');
+
 function updateThreshold(val) {
   threshold = parseInt(val);
   document.getElementById('thresholdVal').innerText = val;
 }
 
-// 可愛い小型犬の鳴き声（キャン！キャン！）
 function playDogBark() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  
-  function bark(delay) {
-    setTimeout(() => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      // 高めの音色（三角波で柔らかい音）
-      osc.type = 'triangle';
-      
-      // 高いピッチから可愛く跳ねるように下降（800Hz → 450Hz）
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(450, ctx.currentTime + 0.1);
-      
-      // キュートな音の余韻（短い減衰）
-      gain.gain.setValueAtTime(0.6, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      
-      osc.start();
-      osc.stop(ctx.currentTime + 0.1);
-    }, delay);
-  }
-
-  bark(0);    // 1回目の「キャン！」
-  bark(120);  // 2回目の「キャン！」
+  dogBarkSound.currentTime = 0;
+  dogBarkSound.play().catch(e => console.log('再生エラー:', e));
 }
 
 async function startMonitoring() {
   try {
+    // iOS Safariで音声再生を事前にアンロック
+    dogBarkSound.play().then(() => {
+      dogBarkSound.pause();
+      dogBarkSound.currentTime = 0;
+    }).catch(() => {});
+
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
