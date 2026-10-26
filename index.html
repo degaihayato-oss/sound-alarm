@@ -245,7 +245,7 @@
       position: absolute;
       top: 0;
       bottom: 0;
-      left: 30%;
+      left: 16%;
       width: 3px;
       background: #0f172a;
       transform: translateX(-1px);
@@ -348,6 +348,14 @@
       width: 100%;
       height: 28px;
       accent-color: var(--blue);
+    }
+
+    .sensitivity-note {
+      margin: 10px 0 0;
+      color: var(--subtext);
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: center;
     }
 
     .sound-box {
@@ -513,7 +521,9 @@
 
       <header class="header">
         <div class="dog-icon" aria-hidden="true">🐕</div>
+
         <h1>音検知アラーム</h1>
+
         <p class="subtitle">
           大きな音を検知して犬の声で知らせます
         </p>
@@ -538,11 +548,21 @@
 
         <div class="volume-section">
           <div class="volume-row">
-            <span class="volume-title">現在の音量</span>
+            <span class="volume-title">
+              現在の音量
+            </span>
 
             <span>
-              <span id="currentVolume" class="volume-number">0</span>
-              <span class="volume-total">/ 100</span>
+              <span
+                id="currentVolume"
+                class="volume-number"
+              >
+                0
+              </span>
+
+              <span class="volume-total">
+                / 100
+              </span>
             </span>
           </div>
 
@@ -553,21 +573,26 @@
 
           <div class="threshold-label">
             反応ライン
-            <strong id="thresholdValue">30</strong>
+            <strong id="thresholdValue">16</strong>
           </div>
         </div>
 
         <section>
-          <h2 class="section-title">反応しやすさ</h2>
+          <h2 class="section-title">
+            反応しやすさ
+          </h2>
 
           <div class="preset-grid">
             <button
               type="button"
               class="preset-button"
               data-name="高感度"
-              data-value="16"
+              data-value="8"
             >
-              <span class="preset-name">高感度</span>
+              <span class="preset-name">
+                高感度
+              </span>
+
               <span class="preset-help">
                 小さな物音にも反応
               </span>
@@ -577,9 +602,12 @@
               type="button"
               class="preset-button selected"
               data-name="標準"
-              data-value="30"
+              data-value="16"
             >
-              <span class="preset-name">標準</span>
+              <span class="preset-name">
+                標準
+              </span>
+
               <span class="preset-help">
                 会話・足音程度
               </span>
@@ -589,9 +617,12 @@
               type="button"
               class="preset-button"
               data-name="低感度"
-              data-value="48"
+              data-value="28"
             >
-              <span class="preset-name">低感度</span>
+              <span class="preset-name">
+                低感度
+              </span>
+
               <span class="preset-help">
                 大きな音だけに反応
               </span>
@@ -599,14 +630,16 @@
           </div>
 
           <details>
-            <summary>細かく調整する</summary>
+            <summary>
+              細かく調整する
+            </summary>
 
             <div class="detail-control">
               <button
                 type="button"
                 id="minusButton"
                 class="step-button"
-                aria-label="感度を高くする"
+                aria-label="反応しやすくする"
               >
                 −
               </button>
@@ -614,10 +647,10 @@
               <input
                 type="range"
                 id="thresholdSlider"
-                min="5"
-                max="70"
+                min="3"
+                max="50"
                 step="1"
-                value="30"
+                value="16"
                 aria-label="反応する音量"
               >
 
@@ -625,20 +658,31 @@
                 type="button"
                 id="plusButton"
                 class="step-button"
-                aria-label="感度を低くする"
+                aria-label="反応しにくくする"
               >
                 ＋
               </button>
             </div>
+
+            <p class="sensitivity-note">
+              数字を小さくすると反応しやすくなります。
+            </p>
           </details>
         </section>
 
         <section class="sound-box">
           <div class="sound-header">
-            <div class="sound-icon" aria-hidden="true">🔊</div>
+            <div
+              class="sound-icon"
+              aria-hidden="true"
+            >
+              🔊
+            </div>
 
             <div class="sound-info">
-              <p class="sound-title">犬の声</p>
+              <p class="sound-title">
+                犬の声
+              </p>
 
               <span id="soundName">
                 内蔵音を使用中
@@ -689,8 +733,12 @@
 
         <div id="errorBox"></div>
 
-        <p id="calibrationNote" class="calibration-note">
-          周囲の音を測定しています。少し静かにしてください。
+        <p
+          id="calibrationNote"
+          class="calibration-note"
+        >
+          周囲の音を測定しています。
+          少し静かにしてください。
         </p>
 
         <button
@@ -728,13 +776,19 @@
     let isCalibrating = false;
     let isAlarmPlaying = false;
 
-    let threshold = 30;
+    let threshold = 16;
     let selectedPreset = "標準";
     let noiseFloor = 0;
     let lastTriggerTime = 0;
     let customSoundUrl = "";
 
+    const minimumThreshold = 3;
+    const maximumThreshold = 50;
+
     const triggerInterval = 3500;
+
+    const sensitivityStorageKey =
+      "soundAlarmThresholdV2";
 
     const statusText =
       document.getElementById("statusText");
@@ -793,7 +847,10 @@
     function setStatus(text, mode) {
       statusText.textContent = text;
 
-      statusIcon.classList.remove("running", "triggered");
+      statusIcon.classList.remove(
+        "running",
+        "triggered"
+      );
 
       if (mode === "running") {
         statusIcon.classList.add("running");
@@ -814,15 +871,32 @@
       errorBox.style.display = "none";
     }
 
-    function setThreshold(value, presetName = "") {
+    function setThreshold(
+      value,
+      presetName = ""
+    ) {
+      const numericValue = Number(value);
+
       threshold = Math.max(
-        5,
-        Math.min(70, Number(value))
+        minimumThreshold,
+        Math.min(
+          maximumThreshold,
+          numericValue
+        )
       );
 
-      thresholdSlider.value = threshold;
-      thresholdValue.textContent = threshold;
-      thresholdLine.style.left = threshold + "%";
+      thresholdSlider.value =
+        String(threshold);
+
+      thresholdValue.textContent =
+        String(threshold);
+
+      /*
+       * メーターは0～100の表示なので、
+       * 閾値をそのままパーセント位置にします。
+       */
+      thresholdLine.style.left =
+        threshold + "%";
 
       selectedPreset = presetName;
 
@@ -838,11 +912,14 @@
 
       try {
         localStorage.setItem(
-          "soundAlarmThreshold",
+          sensitivityStorageKey,
           String(threshold)
         );
       } catch (error) {
-        // 保存できない環境では処理を続行する
+        /*
+         * 保存できない環境でも
+         * アプリの動作は継続します。
+         */
       }
     }
 
@@ -855,88 +932,127 @@
       });
     });
 
-    thresholdSlider.addEventListener("input", () => {
-      setThreshold(thresholdSlider.value);
-    });
-
-    minusButton.addEventListener("click", () => {
-      setThreshold(threshold - 2);
-    });
-
-    plusButton.addEventListener("click", () => {
-      setThreshold(threshold + 2);
-    });
-
-    barkFile.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-
-      if (!file) {
-        return;
-      }
-
-      if (
-        file.type &&
-        !file.type.startsWith("audio/")
-      ) {
-        showError(
-          "音声ファイルを選択してください。"
+    thresholdSlider.addEventListener(
+      "input",
+      () => {
+        setThreshold(
+          thresholdSlider.value
         );
+      }
+    );
+
+    minusButton.addEventListener(
+      "click",
+      () => {
+        setThreshold(threshold - 1);
+      }
+    );
+
+    plusButton.addEventListener(
+      "click",
+      () => {
+        setThreshold(threshold + 1);
+      }
+    );
+
+    barkFile.addEventListener(
+      "change",
+      (event) => {
+        const file = event.target.files[0];
+
+        if (!file) {
+          return;
+        }
+
+        if (
+          file.type &&
+          !file.type.startsWith("audio/")
+        ) {
+          showError(
+            "音声ファイルを選択してください。"
+          );
+
+          barkFile.value = "";
+          return;
+        }
+
+        clearError();
+
+        if (customSoundUrl) {
+          URL.revokeObjectURL(
+            customSoundUrl
+          );
+        }
+
+        customSoundUrl =
+          URL.createObjectURL(file);
+
+        customBarkAudio.src =
+          customSoundUrl;
+
+        customBarkAudio.load();
+
+        soundName.textContent =
+          "選択中：" + file.name;
+
+        resetSoundButton.disabled = false;
+      }
+    );
+
+    resetSoundButton.addEventListener(
+      "click",
+      () => {
+        stopCustomAudio();
+
+        if (customSoundUrl) {
+          URL.revokeObjectURL(
+            customSoundUrl
+          );
+        }
+
+        customSoundUrl = "";
+
+        customBarkAudio.removeAttribute(
+          "src"
+        );
+
+        customBarkAudio.load();
+
         barkFile.value = "";
-        return;
+
+        soundName.textContent =
+          "内蔵音を使用中";
+
+        resetSoundButton.disabled = true;
       }
+    );
 
-      clearError();
+    previewButton.addEventListener(
+      "click",
+      async () => {
+        clearError();
 
-      if (customSoundUrl) {
-        URL.revokeObjectURL(customSoundUrl);
+        try {
+          await ensureAudioContext();
+          await playDogBark(true);
+        } catch (error) {
+          showError(
+            "試聴できませんでした。iPhoneの音量を確認して、もう一度お試しください。"
+          );
+        }
       }
+    );
 
-      customSoundUrl = URL.createObjectURL(file);
-      customBarkAudio.src = customSoundUrl;
-      customBarkAudio.load();
-
-      soundName.textContent =
-        "選択中：" + file.name;
-
-      resetSoundButton.disabled = false;
-    });
-
-    resetSoundButton.addEventListener("click", () => {
-      stopCustomAudio();
-
-      if (customSoundUrl) {
-        URL.revokeObjectURL(customSoundUrl);
+    monitorButton.addEventListener(
+      "click",
+      async () => {
+        if (isMonitoring) {
+          stopMonitoring();
+        } else {
+          await startMonitoring();
+        }
       }
-
-      customSoundUrl = "";
-      customBarkAudio.removeAttribute("src");
-      customBarkAudio.load();
-      barkFile.value = "";
-
-      soundName.textContent = "内蔵音を使用中";
-      resetSoundButton.disabled = true;
-    });
-
-    previewButton.addEventListener("click", async () => {
-      clearError();
-
-      try {
-        await ensureAudioContext();
-        await playDogBark(true);
-      } catch (error) {
-        showError(
-          "試聴できませんでした。iPhoneの音量を確認して、もう一度お試しください。"
-        );
-      }
-    });
-
-    monitorButton.addEventListener("click", async () => {
-      if (isMonitoring) {
-        stopMonitoring();
-      } else {
-        await startMonitoring();
-      }
-    });
+    );
 
     async function ensureAudioContext() {
       const AudioContextClass =
@@ -953,10 +1069,13 @@
         !audioContext ||
         audioContext.state === "closed"
       ) {
-        audioContext = new AudioContextClass();
+        audioContext =
+          new AudioContextClass();
       }
 
-      if (audioContext.state === "suspended") {
+      if (
+        audioContext.state === "suspended"
+      ) {
         await audioContext.resume();
       }
     }
@@ -971,6 +1090,7 @@
         showError(
           "マイクを利用できません。iPhoneのSafariからHTTPSのGitHub Pagesを開いてください。"
         );
+
         return;
       }
 
@@ -978,37 +1098,52 @@
         await ensureAudioContext();
 
         mediaStream =
-          await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: false
-            }
-          });
+          await navigator.mediaDevices
+            .getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: false
+              }
+            });
 
-        analyser = audioContext.createAnalyser();
+        analyser =
+          audioContext.createAnalyser();
+
         analyser.fftSize = 1024;
-        analyser.smoothingTimeConstant = 0.72;
+
+        analyser.smoothingTimeConstant =
+          0.58;
 
         microphone =
-          audioContext.createMediaStreamSource(
-            mediaStream
-          );
+          audioContext
+            .createMediaStreamSource(
+              mediaStream
+            );
 
         microphone.connect(analyser);
 
         isMonitoring = true;
         isCalibrating = true;
+
         noiseFloor = 0;
+
         lastTriggerTime = Date.now();
 
         monitorButton.textContent =
           "■ 監視を止める";
 
-        monitorButton.classList.add("stop");
+        monitorButton.classList.add(
+          "stop"
+        );
 
-        setStatus("周囲の音を確認中…", "running");
-        calibrationNote.style.display = "block";
+        setStatus(
+          "周囲の音を確認中…",
+          "running"
+        );
+
+        calibrationNote.style.display =
+          "block";
 
         await calibrateNoise();
 
@@ -1017,9 +1152,15 @@
         }
 
         isCalibrating = false;
-        calibrationNote.style.display = "none";
 
-        setStatus("監視中", "running");
+        calibrationNote.style.display =
+          "none";
+
+        setStatus(
+          "監視中",
+          "running"
+        );
+
         checkVolume();
 
       } catch (error) {
@@ -1029,46 +1170,71 @@
           "マイクを開始できませんでした。Safariのマイク設定を「許可」にして、ページを再読み込みしてください。"
         );
 
-        setStatus("開始できませんでした", "");
+        setStatus(
+          "開始できませんでした",
+          ""
+        );
       }
     }
 
     function calibrateNoise() {
       return new Promise((resolve) => {
         const samples = [];
-        const data = new Uint8Array(
-          analyser.fftSize
-        );
 
-        const startTime = performance.now();
-        const calibrationDuration = 1400;
+        const data =
+          new Uint8Array(
+            analyser.fftSize
+          );
+
+        const startTime =
+          performance.now();
+
+        const calibrationDuration = 1200;
 
         function sampleNoise() {
-          if (!isMonitoring || !analyser) {
+          if (
+            !isMonitoring ||
+            !analyser
+          ) {
             resolve();
             return;
           }
 
-          analyser.getByteTimeDomainData(data);
+          analyser.getByteTimeDomainData(
+            data
+          );
 
-          const volume = calculateVolume(data);
+          const volume =
+            calculateVolume(data);
+
           samples.push(volume);
 
           if (
-            performance.now() - startTime <
+            performance.now() -
+            startTime <
             calibrationDuration
           ) {
-            requestAnimationFrame(sampleNoise);
+            requestAnimationFrame(
+              sampleNoise
+            );
           } else {
             if (samples.length > 0) {
-              const sorted = [...samples].sort(
-                (a, b) => a - b
-              );
+              const sorted =
+                [...samples].sort(
+                  (a, b) => a - b
+                );
 
-              const middle =
-                Math.floor(sorted.length / 2);
+              /*
+               * 周囲音の測定中に一時的な音が入っても、
+               * 過大評価しにくいよう下位40％付近を使います。
+               */
+              const position =
+                Math.floor(
+                  sorted.length * 0.4
+                );
 
-              noiseFloor = sorted[middle] || 0;
+              noiseFloor =
+                sorted[position] || 0;
             }
 
             resolve();
@@ -1082,21 +1248,45 @@
     function calculateVolume(data) {
       let squareTotal = 0;
 
-      for (let i = 0; i < data.length; i++) {
+      let peak = 0;
+
+      for (
+        let i = 0;
+        i < data.length;
+        i++
+      ) {
         const normalized =
           (data[i] - 128) / 128;
 
         squareTotal +=
           normalized * normalized;
+
+        const absoluteValue =
+          Math.abs(normalized);
+
+        if (absoluteValue > peak) {
+          peak = absoluteValue;
+        }
       }
 
       const rms = Math.sqrt(
         squareTotal / data.length
       );
 
+      /*
+       * RMSと瞬間的なピークを組み合わせます。
+       * 手拍子や物音など短い音も拾いやすくします。
+       */
+      const rmsVolume = rms * 600;
+      const peakVolume = peak * 220;
+
+      const combinedVolume =
+        rmsVolume * 0.72 +
+        peakVolume * 0.28;
+
       return Math.min(
         100,
-        Math.round(rms * 300)
+        Math.round(combinedVolume)
       );
     }
 
@@ -1110,21 +1300,32 @@
       }
 
       const data =
-        new Uint8Array(analyser.fftSize);
+        new Uint8Array(
+          analyser.fftSize
+        );
 
-      analyser.getByteTimeDomainData(data);
-
-      const rawVolume = calculateVolume(data);
-
-      const adjustedVolume = Math.max(
-        0,
-        Math.min(
-          100,
-          Math.round(
-            rawVolume - noiseFloor * 0.55
-          )
-        )
+      analyser.getByteTimeDomainData(
+        data
       );
+
+      const rawVolume =
+        calculateVolume(data);
+
+      /*
+       * 周囲音の差し引きを25％に抑えます。
+       * 従来より小さな音に反応しやすい設定です。
+       */
+      const adjustedVolume =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              rawVolume -
+              noiseFloor * 0.25
+            )
+          )
+        );
 
       updateMeter(adjustedVolume);
 
@@ -1133,7 +1334,8 @@
       const canTrigger =
         !isAlarmPlaying &&
         adjustedVolume >= threshold &&
-        now - lastTriggerTime >= triggerInterval;
+        now - lastTriggerTime >=
+          triggerInterval;
 
       if (canTrigger) {
         lastTriggerTime = now;
@@ -1141,12 +1343,17 @@
       }
 
       animationId =
-        requestAnimationFrame(checkVolume);
+        requestAnimationFrame(
+          checkVolume
+        );
     }
 
     function updateMeter(volume) {
-      currentVolume.textContent = volume;
-      meterBar.style.width = volume + "%";
+      currentVolume.textContent =
+        String(volume);
+
+      meterBar.style.width =
+        volume + "%";
 
       if (volume >= threshold) {
         meterBar.style.backgroundColor =
@@ -1158,7 +1365,10 @@
     }
 
     async function triggerAlarm() {
-      if (!isMonitoring || isAlarmPlaying) {
+      if (
+        !isMonitoring ||
+        isAlarmPlaying
+      ) {
         return;
       }
 
@@ -1181,18 +1391,21 @@
         isAlarmPlaying = false;
 
         if (isMonitoring) {
-          setStatus("監視中", "running");
+          setStatus(
+            "監視中",
+            "running"
+          );
         }
       }, 2700);
     }
 
-    async function playDogBark(isPreview) {
+    async function playDogBark(
+      isPreview
+    ) {
       await ensureAudioContext();
 
       if (customSoundUrl) {
         stopCustomAudio();
-
-        isAlarmPlaying = !isPreview;
 
         customBarkAudio.currentTime = 0;
 
@@ -1200,20 +1413,6 @@
           await customBarkAudio.play();
         } catch (error) {
           throw error;
-        }
-
-        if (!isPreview) {
-          const resetPlayingState = () => {
-            customBarkAudio.removeEventListener(
-              "ended",
-              resetPlayingState
-            );
-          };
-
-          customBarkAudio.addEventListener(
-            "ended",
-            resetPlayingState
-          );
         }
 
         return;
@@ -1224,7 +1423,14 @@
 
     function stopCustomAudio() {
       customBarkAudio.pause();
-      customBarkAudio.currentTime = 0;
+
+      try {
+        customBarkAudio.currentTime = 0;
+      } catch (error) {
+        /*
+         * 音声未読込時のエラーは無視します。
+         */
+      }
     }
 
     function playBuiltInBark() {
@@ -1235,8 +1441,17 @@
       const start =
         audioContext.currentTime + 0.02;
 
-      createBarkSound(start, 0.93, 0.92);
-      createBarkSound(start + 0.31, 1.04, 0.76);
+      createBarkSound(
+        start,
+        0.93,
+        0.92
+      );
+
+      createBarkSound(
+        start + 0.31,
+        1.04,
+        0.76
+      );
     }
 
     function createBarkSound(
@@ -1252,7 +1467,9 @@
       const buffer =
         audioContext.createBuffer(
           1,
-          Math.floor(sampleRate * duration),
+          Math.floor(
+            sampleRate * duration
+          ),
           sampleRate
         );
 
@@ -1261,16 +1478,27 @@
 
       let previousNoise = 0;
 
-      for (let i = 0; i < channel.length; i++) {
-        const time = i / sampleRate;
+      for (
+        let i = 0;
+        i < channel.length;
+        i++
+      ) {
+        const time =
+          i / sampleRate;
 
         const attack =
-          Math.min(1, time / 0.009);
+          Math.min(
+            1,
+            time / 0.009
+          );
 
         const decay =
-          Math.exp(-12.5 * time);
+          Math.exp(
+            -12.5 * time
+          );
 
-        const envelope = attack * decay;
+        const envelope =
+          attack * decay;
 
         const frequency =
           (175 * pitch) -
@@ -1278,12 +1506,16 @@
 
         const throat1 =
           Math.sin(
-            2 * Math.PI * frequency * time
+            2 *
+            Math.PI *
+            frequency *
+            time
           );
 
         const throat2 =
           Math.sin(
-            2 * Math.PI *
+            2 *
+            Math.PI *
             frequency *
             1.83 *
             time
@@ -1309,13 +1541,16 @@
       }
 
       const source =
-        audioContext.createBufferSource();
+        audioContext
+          .createBufferSource();
 
       const bandPass =
-        audioContext.createBiquadFilter();
+        audioContext
+          .createBiquadFilter();
 
       const lowPass =
-        audioContext.createBiquadFilter();
+        audioContext
+          .createBiquadFilter();
 
       const gain =
         audioContext.createGain();
@@ -1323,37 +1558,50 @@
       source.buffer = buffer;
 
       bandPass.type = "bandpass";
-      bandPass.frequency.setValueAtTime(
-        720 * pitch,
-        startTime
-      );
-      bandPass.frequency.exponentialRampToValueAtTime(
-        430 * pitch,
-        startTime + duration
-      );
+
+      bandPass.frequency
+        .setValueAtTime(
+          720 * pitch,
+          startTime
+        );
+
+      bandPass.frequency
+        .exponentialRampToValueAtTime(
+          430 * pitch,
+          startTime + duration
+        );
+
       bandPass.Q.value = 0.7;
 
       lowPass.type = "lowpass";
-      lowPass.frequency.value = 2100;
+
+      lowPass.frequency.value =
+        2100;
 
       gain.gain.setValueAtTime(
         0.7,
         startTime
       );
 
-      gain.gain.exponentialRampToValueAtTime(
-        0.01,
-        startTime + duration
-      );
+      gain.gain
+        .exponentialRampToValueAtTime(
+          0.01,
+          startTime + duration
+        );
 
       source
         .connect(bandPass)
         .connect(lowPass)
         .connect(gain)
-        .connect(audioContext.destination);
+        .connect(
+          audioContext.destination
+        );
 
       source.start(startTime);
-      source.stop(startTime + duration);
+
+      source.stop(
+        startTime + duration
+      );
     }
 
     function stopMonitoring() {
@@ -1362,7 +1610,10 @@
       isAlarmPlaying = false;
 
       if (animationId) {
-        cancelAnimationFrame(animationId);
+        cancelAnimationFrame(
+          animationId
+        );
+
         animationId = null;
       }
 
@@ -1371,7 +1622,9 @@
       if (mediaStream) {
         mediaStream
           .getTracks()
-          .forEach((track) => track.stop());
+          .forEach(
+            (track) => track.stop()
+          );
 
         mediaStream = null;
       }
@@ -1383,21 +1636,29 @@
         audioContext &&
         audioContext.state !== "closed"
       ) {
-        audioContext.close().catch(() => {});
+        audioContext
+          .close()
+          .catch(() => {});
       }
 
       audioContext = null;
 
       updateMeter(0);
 
-      calibrationNote.style.display = "none";
+      calibrationNote.style.display =
+        "none";
 
       monitorButton.textContent =
         "🎤 監視スタート";
 
-      monitorButton.classList.remove("stop");
+      monitorButton.classList.remove(
+        "stop"
+      );
 
-      setStatus("待機中", "");
+      setStatus(
+        "待機中",
+        ""
+      );
     }
 
     document.addEventListener(
@@ -1416,47 +1677,95 @@
       }
     );
 
-    window.addEventListener("beforeunload", () => {
-      if (customSoundUrl) {
-        URL.revokeObjectURL(customSoundUrl);
+    window.addEventListener(
+      "beforeunload",
+      () => {
+        if (customSoundUrl) {
+          URL.revokeObjectURL(
+            customSoundUrl
+          );
+        }
+
+        if (mediaStream) {
+          mediaStream
+            .getTracks()
+            .forEach(
+              (track) => track.stop()
+            );
+        }
       }
+    );
 
-      if (mediaStream) {
-        mediaStream
-          .getTracks()
-          .forEach((track) => track.stop());
-      }
-    });
+    function loadSavedThreshold() {
+      try {
+        const savedThreshold =
+          localStorage.getItem(
+            sensitivityStorageKey
+          );
 
-    try {
-      const savedThreshold =
-        localStorage.getItem(
-          "soundAlarmThreshold"
-        );
+        if (savedThreshold === null) {
+          setThreshold(
+            16,
+            "標準"
+          );
 
-      if (savedThreshold !== null) {
+          return;
+        }
+
         const savedValue =
           Number(savedThreshold);
 
         if (
-          Number.isFinite(savedValue) &&
-          savedValue >= 5 &&
-          savedValue <= 70
+          !Number.isFinite(
+            savedValue
+          ) ||
+          savedValue <
+            minimumThreshold ||
+          savedValue >
+            maximumThreshold
         ) {
-          if (savedValue === 16) {
-            setThreshold(16, "高感度");
-          } else if (savedValue === 30) {
-            setThreshold(30, "標準");
-          } else if (savedValue === 48) {
-            setThreshold(48, "低感度");
-          } else {
-            setThreshold(savedValue);
-          }
+          setThreshold(
+            16,
+            "標準"
+          );
+
+          return;
         }
+
+        if (savedValue === 8) {
+          setThreshold(
+            8,
+            "高感度"
+          );
+        } else if (
+          savedValue === 16
+        ) {
+          setThreshold(
+            16,
+            "標準"
+          );
+        } else if (
+          savedValue === 28
+        ) {
+          setThreshold(
+            28,
+            "低感度"
+          );
+        } else {
+          setThreshold(
+            savedValue
+          );
+        }
+
+      } catch (error) {
+        setThreshold(
+          16,
+          "標準"
+        );
       }
-    } catch (error) {
-      setThreshold(30, "標準");
     }
+
+    loadSavedThreshold();
   </script>
 </body>
 </html>
